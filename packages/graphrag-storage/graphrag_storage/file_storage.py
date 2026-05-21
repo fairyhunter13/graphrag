@@ -45,7 +45,11 @@ class FileStorage(Storage):
         logger.info(
             "Search [%s] for files matching [%s]", self._base_dir, file_pattern.pattern
         )
-        all_files = list(self._base_dir.rglob("**/*"))
+        all_files = [
+            Path(root) / f
+            for root, _dirs, files in os.walk(self._base_dir, followlinks=True)
+            for f in files
+        ]
         logger.debug("All files and folders: %s", [file.name for file in all_files])
         num_loaded = 0
         num_total = len(all_files)

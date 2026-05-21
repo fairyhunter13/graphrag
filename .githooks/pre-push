@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# pre-push: enforce that this branch stays at most 1 commit ahead of upstream/main.
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+UPSTREAM_REMOTE="upstream"
+UPSTREAM_BRANCH="main"
+MAX_AHEAD=1
+
+# Silently fetch upstream so we compare against the latest state.
+if ! git fetch "$UPSTREAM_REMOTE" "$UPSTREAM_BRANCH" --quiet 2>/dev/null; then
+  echo "pre-push: WARNING: could not fetch ${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH} — skipping ahead-check." >&2
+  exit 0
+fi
+
+AHEAD=$(git rev-list --count "${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}..HEAD")
+
+if [ "$AHEAD" -gt "$MAX_AHEAD" ]; then
+  echo "" >&2
+  echo "pre-push: REJECTED — branch is ${AHEAD} commit(s) ahead of ${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}." >&2
+  echo "          Only ${MAX_AHEAD} commit ahead is allowed." >&2
+  echo "" >&2
+  echo "          Squash all your commits into one before pushing:" >&2
+  echo "            git rebase -i ${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}" >&2
+  echo "" >&2
+  exit 1
+fi
+
+exit 0

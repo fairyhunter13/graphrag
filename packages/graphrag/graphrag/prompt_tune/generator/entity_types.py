@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 
 from graphrag_llm.utils import (
     CompletionMessagesBuilder,
+    structure_completion_response,
 )
+from litellm.exceptions import BadRequestError
 from pydantic import BaseModel
 
 from graphrag.prompt_tune.defaults import DEFAULT_TASK
@@ -59,13 +61,20 @@ async def generate_entity_types(
     )
 
     if json_mode:
-        response: LLMCompletionResponse[
-            EntityTypesResponse
-        ] = await model.completion_async(
-            messages=messages,
-            response_format=EntityTypesResponse,
-        )  # type: ignore
-        parsed_model = response.formatted_response
+        try:
+            response: LLMCompletionResponse[
+                EntityTypesResponse
+            ] = await model.completion_async(
+                messages=messages,
+                response_format=EntityTypesResponse,
+            )  # type: ignore
+            parsed_model = response.formatted_response
+        except BadRequestError:
+            fallback: LLMCompletionResponse = await model.completion_async(
+                messages=messages,
+                response_format_json_object=True,
+            )  # type: ignore
+            parsed_model = structure_completion_response(fallback.content, EntityTypesResponse) if fallback.content else None
         return parsed_model.entity_types if parsed_model else []
 
     non_json_response: LLMCompletionResponse = await model.completion_async(

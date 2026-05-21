@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from graphrag_llm.tokenizer import Tokenizer
+from graphrag_llm.utils import structure_completion_response
+from litellm.exceptions import BadRequestError
 from pydantic import BaseModel, Field
 from tqdm.asyncio import tqdm_asyncio
 
@@ -159,13 +161,22 @@ class DRIFTPrimer:
         prompt = DRIFT_PRIMER_PROMPT.format(
             query=query, community_reports=community_reports
         )
-        model_response: LLMCompletionResponse[
-            PrimerResponse
-        ] = await self.chat_model.completion_async(
-            messages=prompt, response_format=PrimerResponse
-        )  # type: ignore
-
-        parsed_response = model_response.formatted_response.model_dump()  # type: ignore
+        try:
+            model_response: LLMCompletionResponse[
+                PrimerResponse
+            ] = await self.chat_model.completion_async(
+                messages=prompt, response_format=PrimerResponse
+            )  # type: ignore
+            parsed_response = model_response.formatted_response.model_dump()  # type: ignore
+        except BadRequestError:
+            logger.warning(
+                "Provider rejected structured output for drift primer; "
+                "retrying with json_object mode"
+            )
+            model_response = await self.chat_model.completion_async(
+                messages=prompt, response_format_json_object=True
+            )  # type: ignore
+            parsed_response = structure_completion_response(model_response.content, PrimerResponse).model_dump()
 
         token_ct = {
             "llm_calls": 1,

@@ -8,9 +8,11 @@ import traceback
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from litellm.exceptions import BadRequestError
 from pydantic import BaseModel, Field
 
 from graphrag.index.typing.error_handler import ErrorHandlerFn
+from graphrag_llm.utils import structure_completion_response
 
 if TYPE_CHECKING:
     from graphrag_llm.completion import LLMCompletion
@@ -79,12 +81,23 @@ class CommunityReportsExtractor:
                 INPUT_TEXT_KEY: input_text,
                 MAX_LENGTH_KEY: str(self._max_report_length),
             })
-            response = await self._model.completion_async(
-                messages=prompt,
-                response_format=CommunityReportResponse,  # A model is required when using json mode
-            )
-
-            output = response.formatted_response  # type: ignore
+            try:
+                response = await self._model.completion_async(
+                    messages=prompt,
+                    response_format=CommunityReportResponse,
+                )
+                output = response.formatted_response
+            except BadRequestError:
+                logger.warning(
+                    "Provider rejected structured output for community reports; "
+                    "retrying with json_object mode"
+                )
+                response = await self._model.completion_async(
+                    messages=prompt,
+                    response_format_json_object=True,
+                )
+                if response.content:
+                    output = structure_completion_response(response.content, CommunityReportResponse)
         except Exception as e:
             logger.exception("error generating community report")
             self._on_error(e, traceback.format_exc(), None)

@@ -1,0 +1,40 @@
+[project]
+name = "graphrag-mcp"
+version = "3.0.9"
+description = "MCP server for Microsoft GraphRAG — exposes graph-based RAG search as MCP tools."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "fairyhunter13" }]
+keywords = ["mcp", "graphrag", "rag", "knowledge-graph", "llm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "graphrag>=3.0.9",
+    "mcp[cli]>=1.9.0",
+]
+
+[project.scripts]
+graphrag-mcp = "graphrag_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/fairyhunter13/graphrag"
+Repository = "https://github.com/fairyhunter13/graphrag"
+Issues = "https://github.com/fairyhunter13/graphrag/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["graphrag_mcp"]
+
+[tool.uv.sources]
+graphrag = { workspace = true }

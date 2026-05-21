@@ -1,0 +1,104 @@
+name: Publish graphrag-mcp
+
+# Triggered by tags like: mcp-v3.0.9, mcp-v3.1.0, etc.
+on:
+  push:
+    tags:
+      - "mcp-v*"
+
+permissions:
+  contents: read
+  id-token: write  # Required for PyPI trusted publishing
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Extract version from the tag (mcp-v3.0.9 -> 3.0.9)
+  # -------------------------------------------------------------------------
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Parse version from tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#mcp-v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: ${VERSION}"
+
+  # -------------------------------------------------------------------------
+  # Publish npm package to npmjs.org
+  # -------------------------------------------------------------------------
+  publish-npm:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set version in package.json
+        working-directory: packages/graphrag-mcp
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          # Update version field in place using node
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          echo "Set npm package version to ${VERSION}"
+          cat package.json
+
+      - name: Publish to npm
+        working-directory: packages/graphrag-mcp
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # -------------------------------------------------------------------------
+  # Publish Python package to PyPI
+  # -------------------------------------------------------------------------
+  publish-pypi:
+    needs: version
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/graphrag-mcp/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set version in pyproject.toml
+        working-directory: packages/graphrag-mcp
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          uv run python -c "
+          import re, pathlib
+          p = pathlib.Path('pyproject.toml')
+          text = p.read_text()
+          text = re.sub(r'^version = \".*\"', 'version = \"${VERSION}\"', text, flags=re.MULTILINE)
+          p.write_text(text)
+          "
+          echo "Set Python package version to ${VERSION}"
+
+      - name: Build Python package
+        working-directory: packages/graphrag-mcp
+        # Build without workspace deps so the standalone package resolves graphrag from PyPI
+        run: uv build --no-sources
+
+      - name: Publish to PyPI (trusted publishing)
+        working-directory: packages/graphrag-mcp
+        run: uv publish
+        # Uses OIDC trusted publishing — no token needed if configured on PyPI.
+        # Fallback: set UV_PUBLISH_TOKEN secret if OIDC is not set up.
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}

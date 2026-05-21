@@ -1,0 +1,25 @@
+{
+  "name": "graphrag-mcp",
+  "version": "3.0.9",
+  "description": "MCP server for Microsoft GraphRAG — exposes graph-based RAG search as MCP tools.",
+  "keywords": ["mcp", "graphrag", "rag", "knowledge-graph", "llm", "claude"],
+  "license": "MIT",
+  "author": "fairyhunter13",
+  "homepage": "https://github.com/fairyhunter13/graphrag",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fairyhunter13/graphrag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fairyhunter13/graphrag/issues"
+  },
+  "bin": {
+    "graphrag-mcp": "./bin/graphrag-mcp.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
